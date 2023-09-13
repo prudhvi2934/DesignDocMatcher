@@ -1,0 +1,34 @@
+# openai
+# langchain
+# streamlit
+# PyPDF2
+# tiktoken
+# faiss-cpu
+
+langchain==0.0.279
+PyPDF2
+python-dotenv
+streamlit
+openai
+faiss-cpu
+tiktoken
+altair==4.2.2
+pandas
+numpy
+opencv-python
+ultralytics
+easyocr
+pypdf
+roboflow
+opencv-python
+tensorboard
+ultralytics
+python-dotenv
+scikit-learn
+
+# uncomment to use huggingface llms
+# huggingface-hub==0.14.1
+
+# uncomment to use instructor embeddings
+# InstructorEmbedding==1.0.1
+# sentence-transformers==2.2.2
