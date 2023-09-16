@@ -20,7 +20,7 @@ A comprehensive tool that integrates test case generation, web UI element detect
 1. Clone the repository:
 
    ```bash
-   git clone [repository-link]
+   git clone https://github.com/prudhvi2934/DesignDocMatcher.git
    ```
 
 2. Navigate to the project directory:
@@ -37,7 +37,7 @@ A comprehensive tool that integrates test case generation, web UI element detect
 
 4. Create a `.env` file in the root directory and add your OpenAI API key:
    ```bash
-   echo "OPENAI_API_KEY=your_api_key_here" > .env
+   OPENAI_API_KEY=your_api_key_here
    ```
 
 ## Usage
@@ -54,3 +54,24 @@ For the Streamlit app:
 streamlit run streamlit_app.py
 
 ```
+For the integrated execution:
+
+```bash
+python integrated_execution.py
+```
+
+## Configuration
+You can configure the thresholds and model paths in the respective execution files.
+
+## Contributing
+1. Fork the repository.
+2. Create a new branch.
+3. Commit your changes and push to your branch.
+4. Create a pull request.
+
+## License
+This project is licensed under the MIT License.
+
+## Acknowledgments
+- OpenAI for the semantic comparison tool.
+- YOLO for the object detection model.
