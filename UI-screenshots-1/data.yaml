@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 8
+names: ['button', 'field', 'heading', 'iframe', 'image', 'label', 'link', 'text']
+
+roboflow:
+  workspace: webuiproject
+  project: ui-screenshots
+  version: 1
+  license: MIT
+  url: https://universe.roboflow.com/webuiproject/ui-screenshots/dataset/1

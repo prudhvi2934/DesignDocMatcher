@@ -1,11 +1,10 @@
 import os
 import logging
 import re
-
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
 from langchain.text_splitter import CharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings, HuggingFaceInstructEmbeddings
+from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.chat_models import ChatOpenAI
 from langchain.memory import ConversationBufferMemory
@@ -14,7 +13,7 @@ from langchain.llms import OpenAI
 from langchain.chains.question_answering import load_qa_chain
 from langchain.output_parsers import CommaSeparatedListOutputParser
 from langchain.prompts import PromptTemplate
-
+from langchain.document_loaders import PyPDFLoader
 
 
 logging.basicConfig(level=logging.INFO,
@@ -30,14 +29,35 @@ class TestCaseRetriever:
         self.pdf_docs = pdf_docs
 
     def get_pdf_text(self):
+        """
+        Extracts and returns the combined text content from all the PDF documents
+        in the pdf_docs attribute of the object.
+
+        Returns:
+        text (str): A concatenated string containing the text content from all 
+        the PDF pages in the pdf_docs.
+        """
+
         text = ""
         for pdf in self.pdf_docs:
             pdf_reader = PdfReader(pdf)
             for page in pdf_reader.pages:
                 text += page.extract_text()
+
         return text
 
     def get_text_chunks(self, text):
+        """
+        Splits the given text into overlapping chunks of a defined size using 
+        CharacterTextSplitter.
+
+        Args:
+            text (str): Text to split.
+
+        Returns:
+            list: Chunks of split text.
+        """
+
         text_splitter = CharacterTextSplitter(
             separator="\n",
             chunk_size=1000,
@@ -45,21 +65,45 @@ class TestCaseRetriever:
             length_function=len
         )
         chunks = text_splitter.split_text(text)
+
         return chunks
 
     def get_vectorstore(self, text_chunks):
+        """
+        Converts a list of text chunks into a vector store using 
+        OpenAIEmbeddings and FAISS.
+
+        Args:
+            text_chunks (list): List of text segments.
+
+        Returns:
+            vectorstore: FAISS vector storage representation of the
+            text embeddings.
+        """
+
         embeddings = OpenAIEmbeddings()
-        # embeddings = HuggingFaceInstructEmbeddings(model_name="hkunlp/instructor-xl")
         vectorstore = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
+
         return vectorstore
 
     def get_conversation_chain(self, vectorstore):
+        """
+        Constructs a conversational retrieval chain using OpenAI chat model,
+        a vector store retriever, and a buffer memory.
+
+        Args:
+            vectorstore: FAISS vector storage representation of text embeddings.
+
+        Returns:
+            conversation_chain: Conversational retrieval mechanism for engaging
+            with the ChatOpenAI model.
+        """
 
         llm = ChatOpenAI()
-        # llm = HuggingFaceHub(repo_id="google/flan-t5-xxl", model_kwargs={"temperature":0.5, "max_length":512})
 
         memory = ConversationBufferMemory(
             memory_key='chat_history', return_messages=True)
+        
         conversation_chain = ConversationalRetrievalChain.from_llm(
             llm=llm,
             retriever=vectorstore.as_retriever(),
@@ -70,86 +114,67 @@ class TestCaseRetriever:
         return conversation_chain
 
     def retrieve_test_cases(self, user_input):
-        # Using the conversation chain to retrieve relevant chunks based on user input
+        """
+        Retrieves relevant test cases from PDF content based on user input using 
+        a conversational retrieval mechanism.
+
+        Args:
+            user_input (str): User's query to retrieve relevant test cases.
+
+        Returns:
+            list: A list of relevant test cases extracted from the retrieval process.
+        """
+
         text = self.get_pdf_text()
         text_chunks = self.get_text_chunks(text)
         vectorstore = self.get_vectorstore(text_chunks)
         conversation_chain = self.get_conversation_chain(vectorstore)
         retrieved_chunks = conversation_chain(user_input)
-        # Assuming retrieved chunks are test cases
-        # print(retrieved_chunks)
         ai_message_content = retrieved_chunks['answer']
-        # print(ai_message_content)
         test_cases = ai_message_content.split(':\n\n')[1]
         pattern = re.compile(r'\n\n[A-Za-z].*$', re.S)
-        # Remove matched content
         modified_tcs = re.sub(pattern, '', test_cases)
-        print(modified_tcs)
-        text = self.adaptive_extract_as_list_v2(modified_tcs)
-        print(text)
-        # Storing the results
+        text = self.extract_as_list(modified_tcs)
         self.stored_results.extend(text)
 
         return text
 
-    def adaptive_extract_as_list_v2(self, text):
+    def extract_as_list(self, text):
         """
-        Adaptively extracts points from the given text based on its format and returns them as a list.
-        This version ensures that section headers are not included in the result.
+        Extracts list items from the provided text based on specific number
+        and hyphen patterns.
+
+        Args:
+            text (str): The input text containing items to extract.
+
+        Returns:
+            list: A list of extracted items without trailing colons.
         """
-        # Define patterns for two types of points
+
         pattern1 = re.compile(
             r'^\d+\.\s(.*?)(?=\n\d+\.|\n\n\d+\.|$)', re.S | re.M)
         pattern2 = re.compile(r'^-\s(.*?)(?=\n-|\n\n-|$)', re.S | re.M)
 
         points = []
 
-        # Extract points based on the patterns found in the text
         if pattern1.search(text):
             points.extend([match.strip() for match in pattern1.findall(
                 text) if not match.strip().endswith(':')])
-        if "\n\n" in text:  # If the text contains dashed points
+        if "\n\n" in text:
             points.extend([match.strip() for match in pattern2.findall(
                 text) if not match.strip().endswith(':')])
 
         return points
 
-
-def get_stored_results(self):
-    return self.stored_results
-
-
-class ChatBotInterface:
-    def __init__(self, test_case_manager):
-        self.test_case_manager = test_case_manager
-
-    def start_chat(self):
-        while True:
-            # Get user input
-            user_input = input("You: ")
-
-            # If the user wants to exit the chat
-            if user_input.lower() in ["exit", "quit", "bye"]:
-                print("Goodbye!")
-                break
-
-            response = self.test_case_manager.retrieve_test_cases(
-                user_input)
-            # print(f"Bot: {response['answer']}\\n")
-
-            if "test cases to check the webui elements" in user_input.lower():
-                ai_message_content = response['answer']
-                # test_cases = "\n".join([line for line in ai_message_content.split(
-                #     '\n') if line.strip() and line[0].isdigit()])
-                return ai_message_content
+    def get_stored_results(self):
+        return self.stored_results
 
 
 class KeywordExtractor:
 
     def __init__(self):
-        # Dynamically loaded keywords related to UI elements.
-        # This is just a sample. In real implementation, this can be loaded dynamically or updated as needed.
-        self.dynamic_keywords = {
+
+        self.keywords = {
             'button': ['click', 'press', 'navigate', 'tab', 'link'],
             'text': ['information', 'description', 'tagline', 'section', 'content', 'details', 'overview'],
             'image': ['picture', 'photo', 'banner', 'background', 'icon', 'logo', 'thumbnail'],
@@ -164,6 +189,7 @@ class KeywordExtractor:
         """
         Process multiple test cases to extract associated web UI elements.
         """
+
         test_cases = [line.strip() for line in test_cases_str.split(
             '\n') if line.strip() and line[0].isdigit()]
         test_case_to_elements = {}
@@ -179,32 +205,46 @@ class KeywordExtractor:
         """
         Extract keywords related to UI element types from a given test case.
         """
+
         extracted_elements = set()
 
-        for element_type, keywords in self.dynamic_keywords.items():
+        for element_type, keywords in self.keywords.items():
             if any(keyword in test_case.lower() for keyword in keywords):
                 extracted_elements.add(element_type)
 
         return extracted_elements
 
 
-# # Example of usage:
-# Initialize the TestCaseRetriever with a list of PDFs
-# retriever = TestCaseRetriever(["Ripple_tocuch.pdf"])
-# # # User provides input requesting specific test cases
-# user_input = "what are the web UI test cases to check the design of the Home Page"
-# test_cases = retriever.retrieve_test_cases(user_input)
-# print(test_cases)
-# Starting the chatbot interaction using the new class
-# retriever = TestCaseRetriever(["Lighthouse_Law_AI_generated_spec.pdf"])
-# chatbot = ChatBotInterface(retriever)
-# sample_test_case = chatbot.start_chat()
-# print(sample_test_case)
+class PagesExtractor:
 
+    def get_pages_from_pdf(pdf_path, section):
+        """
+        Retrieves content from a specified section of a PDF using a Q&A
+        retrieval chain.
 
-# Sample Usage:
-# extractor = KeywordExtractor()
-# sample_test_case = "Test case: Verify that the banner section on the home page contains a background image."
-# logger.warning("Using hardcoded test case.")
-# extracted_keywords = extractor.process_test_cases(sample_test_case)
-# print(extracted_keywords)
+        Args:
+            pdf_path (str): Path to the target PDF file.
+            section (str): The name/identifier of the section in the PDF
+            from which to retrieve content.
+
+        Returns:
+            list: A list of items extracted from the specified section of the PDF.
+        """
+
+        loader = PyPDFLoader(pdf_path)
+        documents = loader.load()
+
+        output_parser = CommaSeparatedListOutputParser()
+        format_instructions = output_parser.get_format_instructions()
+        prompt = PromptTemplate(
+            template="what are there in section {subject}.\n{format_instructions}",
+            input_variables=["subject"],
+            partial_variables={"format_instructions": format_instructions}
+        )
+        input = prompt.format(subject=section)
+        chain = load_qa_chain(llm=OpenAI(), chain_type="stuff")
+
+        chain_output = chain.run(input_documents=documents, question=input)
+        items = output_parser.parse(chain_output)
+
+        return items
